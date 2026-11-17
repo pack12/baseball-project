@@ -1,0 +1,27 @@
+{% extends "hub/base.html" %}
+{% block title %}Search: {{ query }}{% endblock %}
+{% block content %}
+  <h1>Search</h1>
+  {% if not query %}
+    <p class="muted">Type a player's name in the search box.</p>
+  {% elif not players %}
+    <p class="empty">No players match "{{ query }}".</p>
+  {% else %}
+    <p class="muted">
+      {% if truncated %}First {{ players|length }} matches{% else %}{{ players|length }} matches{% endif %} for "{{ query }}".
+      {% if truncated %}Add a first name to narrow it down.{% endif %}
+    </p>
+    <table>
+      <thead><tr><th class="l">Player</th><th class="l">Pos</th><th class="l">Years</th></tr></thead>
+      <tbody>
+        {% for player in players %}
+          <tr>
+            <td class="l"><a href="{% url 'hub:player' player.pk %}">{{ player.name_full }}</a></td>
+            <td class="l">{{ player.primary_position|default:"—" }}</td>
+            <td class="l">{% if player.first_year %}{{ player.first_year }}–{{ player.last_year }}{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

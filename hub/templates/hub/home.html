@@ -1,0 +1,13 @@
+{% extends "hub/base.html" %}
+{% block content %}
+  <h1>Player Evaluation Hub</h1>
+  <p class="muted">Statcast, traditional stats and the Contact Quality Score for every hitter, on one page. Search for a player above.</p>
+
+  {% if leaders %}
+    <h2>Contact Quality leaders, {{ season }}</h2>
+    {% include "hub/_leaders.html" %}
+    <p class="small"><a href="{% url 'hub:leaderboard' %}">Full leaderboard, by position</a></p>
+  {% else %}
+    <p class="empty">No data loaded yet. Run <code>python manage.py refresh_all</code>.</p>
+  {% endif %}
+{% endblock %}

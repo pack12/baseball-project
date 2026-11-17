@@ -1,0 +1,27 @@
+{% load hubfmt %}
+<div class="scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th class="l">Player</th><th class="l">Pos</th><th>Score</th><th>Pctl</th>
+        <th>BBE</th><th>Avg EV</th><th>Hard-hit%</th><th>Sweet-spot%</th><th>xwOBA</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in leaders %}
+        <tr>
+          <td>{{ row.rank }}</td>
+          <td class="l"><a href="{% url 'hub:player' row.player_id %}">{{ row.player.name_full }}</a></td>
+          <td class="l">{{ row.position|default:"—" }}</td>
+          <td class="score">{{ row.score|dec:0 }}</td>
+          <td>{{ row.percentile|ordinal }}</td>
+          <td>{{ row.statcast.bbe }}</td>
+          <td>{{ row.statcast.avg_ev|dec }}</td>
+          <td>{{ row.statcast.hard_hit_pct|dec }}</td>
+          <td>{{ row.statcast.sweet_spot_pct|dec }}</td>
+          <td>{{ row.statcast.xwoba|rate }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,141 @@
+{% extends "hub/base.html" %}
+{% load hubfmt %}
+{% block title %}{{ player.name_full }}{% endblock %}
+{% block content %}
+  <h1>{{ player.name_full }}</h1>
+  <div class="muted">
+    {{ player.primary_position|default:"Position unknown" }}
+    {% if player.bats %} · Bats {{ player.bats }} / Throws {{ player.throws }}{% endif %}
+    {% if player.birth_date %} · Born {{ player.birth_date|date:"M j, Y" }}{% endif %}
+    {% if player.first_year %} · MLB {{ player.first_year }}–{{ player.last_year }}{% endif %}
+  </div>
+  <div class="ids small">
+    <a href="https://baseballsavant.mlb.com/savant-player/{{ player.mlbam_id }}">Savant {{ player.mlbam_id }}</a>
+    {% if player.fangraphs_id %}<a href="https://www.fangraphs.com/players/x/{{ player.fangraphs_id }}/stats">FanGraphs {{ player.fangraphs_id }}</a>{% endif %}
+    {% if player.bbref_id %}<a href="https://www.baseball-reference.com/players/{{ player.bbref_id|slice:':1' }}/{{ player.bbref_id }}.shtml">Baseball-Reference {{ player.bbref_id }}</a>{% endif %}
+    {% if player.lahman_id %}<span class="muted">Lahman {{ player.lahman_id }}</span>{% endif %}
+  </div>
+
+  <h2>Contact Quality Score</h2>
+  {% if headline %}
+    <div class="card headline">
+      <div>
+        <div class="big">{{ headline.score|dec:0 }}</div>
+        <div class="muted small">{{ headline.season }} · 100 is average</div>
+      </div>
+      <div>
+        <div><strong>{{ headline.percentile|ordinal }}</strong> percentile</div>
+        <div class="small muted">
+          #{{ headline.rank }} of {{ headline.of }} hitters{% if headline.position %},
+          #{{ headline.position_rank }} of {{ headline.position_of }} at
+          <a href="{% url 'hub:leaderboard' %}?season={{ headline.season }}&pos={{ headline.position }}">{{ headline.position }}</a>{% endif %}
+        </div>
+      </div>
+      <div class="parts small">
+        <div><span class="muted">Avg exit velo</span><strong>{{ headline.inputs.avg_ev|dec }} mph</strong><span class="muted">{{ headline.ev_z|signed }} SD</span></div>
+        <div><span class="muted">Hard-hit rate</span><strong>{{ headline.inputs.hard_hit_pct|dec }}%</strong><span class="muted">{{ headline.hard_hit_z|signed }} SD</span></div>
+        <div><span class="muted">Sweet-spot rate</span><strong>{{ headline.inputs.sweet_spot_pct|dec }}%</strong><span class="muted">{{ headline.sweet_spot_z|signed }} SD</span></div>
+      </div>
+    </div>
+  {% else %}
+    <p class="empty">No score: it needs a season of {{ min_bbe }}+ tracked batted balls (Statcast began in 2015).</p>
+  {% endif %}
+
+  <h2>Statcast</h2>
+  {% if statcast %}
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="l">Season</th><th>CQ Score</th><th>BBE</th><th>Avg EV</th><th>Max EV</th><th>Avg LA</th>
+            <th>Hard-hit%</th><th>Sweet-spot%</th><th>Barrel%</th><th>BA</th><th>xBA</th><th>SLG</th><th>xSLG</th><th>wOBA</th><th>xwOBA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in statcast %}
+            <tr>
+              <td class="l">{{ row.season }}</td>
+              <td class="score">{% if row.contact_quality %}{{ row.contact_quality.score|dec:0 }}{% else %}—{% endif %}</td>
+              <td>{{ row.bbe }}</td>
+              <td>{{ row.avg_ev|dec }}</td>
+              <td>{{ row.max_ev|dec }}</td>
+              <td>{{ row.avg_la|dec }}</td>
+              <td>{{ row.hard_hit_pct|dec }}</td>
+              <td>{{ row.sweet_spot_pct|dec }}</td>
+              <td>{{ row.barrel_pct|dec }}</td>
+              <td>{{ row.ba|rate }}</td>
+              <td>{{ row.xba|rate }}</td>
+              <td>{{ row.slg|rate }}</td>
+              <td>{{ row.xslg|rate }}</td>
+              <td>{{ row.woba|rate }}</td>
+              <td>{{ row.xwoba|rate }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No Statcast batting data for this player.</p>
+  {% endif %}
+
+  <h2>Traditional batting <span class="muted small">Lahman</span></h2>
+  {% if batting %}
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="l">Season</th><th class="l">Team</th><th class="l">Pos</th><th>G</th><th>PA</th><th>AB</th><th>R</th><th>H</th>
+            <th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>SB</th><th>BB</th><th>SO</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in batting %}
+            <tr>
+              <td class="l">{{ row.season }}</td><td class="l">{{ row.team }}</td><td class="l">{{ row.position|default:"—" }}</td>
+              {% include "hub/_batting_cells.html" %}
+            </tr>
+          {% endfor %}
+          {% if career %}
+            {% with row=career %}
+              <tr class="total">
+                <td class="l" colspan="3">Career</td>
+                {% include "hub/_batting_cells.html" %}
+              </tr>
+            {% endwith %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">
+      No batting lines in Lahman for this player.
+      {% if player.primary_position == "P" %}Pitching stats are not loaded; the hub covers hitters for now.{% endif %}
+    </p>
+  {% endif %}
+
+  <h2>FanGraphs</h2>
+  {% if fangraphs %}
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="l">Season</th><th class="l">Team</th><th>G</th><th>PA</th><th>HR</th>
+            <th>BB%</th><th>K%</th><th>ISO</th><th>BABIP</th><th>wOBA</th><th>wRC+</th><th>WAR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in fangraphs %}
+            <tr>
+              <td class="l">{{ row.season }}</td><td class="l">{{ row.team }}</td>
+              <td>{{ row.g|default_if_none:"—" }}</td><td>{{ row.pa|default_if_none:"—" }}</td><td>{{ row.hr|default_if_none:"—" }}</td>
+              <td>{{ row.bb_pct|pct }}</td><td>{{ row.k_pct|pct }}</td><td>{{ row.iso|rate }}</td><td>{{ row.babip|rate }}</td>
+              <td>{{ row.woba|rate }}</td><td>{{ row.wrc_plus|dec:0 }}</td><td>{{ row.war|dec }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="empty">No FanGraphs seasons loaded for this player.</p>
+  {% endif %}
+{% endblock %}

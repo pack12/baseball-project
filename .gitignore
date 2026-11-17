@@ -1,0 +1,15 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local database and downloaded source data (rebuilt by `manage.py refresh_all`)
+db.sqlite3
+data/raw/
+
+# Secrets
+.env
+
+# Editor / OS
+.idea/
+.DS_Store

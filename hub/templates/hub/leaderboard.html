@@ -1,0 +1,38 @@
+{% extends "hub/base.html" %}
+{% block title %}Contact Quality leaderboard{% endblock %}
+{% block content %}
+  <h1>Contact Quality leaderboard</h1>
+  <p class="muted">
+    100 is the average hitter with {{ min_bbe }}+ batted balls that season; every 15 points is one standard deviation.
+    Built from average exit velocity ({{ weights.avg_ev }}%), hard-hit rate ({{ weights.hard_hit_pct }}%)
+    and sweet-spot rate ({{ weights.sweet_spot_pct }}%).
+  </p>
+
+  {% if not season %}
+    <p class="empty">No data loaded yet. Run <code>python manage.py refresh_all</code>.</p>
+  {% else %}
+    <div class="pills">
+      {% for s in seasons %}
+        <a href="?season={{ s }}&pos={{ position }}" {% if s == season %}class="on"{% endif %}>{{ s }}</a>
+      {% endfor %}
+    </div>
+    <div class="pills">
+      <a href="?season={{ season }}" {% if not position %}class="on"{% endif %}>All</a>
+      {% for p in positions %}
+        <a href="?season={{ season }}&pos={{ p }}" {% if p == position %}class="on"{% endif %}>{{ p }}</a>
+      {% endfor %}
+    </div>
+
+    {% if leaders %}
+      {% include "hub/_leaders.html" %}
+    {% else %}
+      <p class="empty">No qualified hitters at this position in {{ season }}.</p>
+    {% endif %}
+    {% if positions_carried_from %}
+      <p class="small muted">
+        Lahman's position data ends at {{ positions_carried_from }}, so {{ season }} uses each hitter's
+        {{ positions_carried_from }} (or most recent) position. Hitters with no earlier season appear under All only.
+      </p>
+    {% endif %}
+  {% endif %}
+{% endblock %}
