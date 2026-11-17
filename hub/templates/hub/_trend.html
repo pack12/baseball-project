@@ -1,0 +1,19 @@
+<svg viewBox="0 0 {{ trend.width }} {{ trend.height }}" role="img" aria-label="{{ title }} by season. {{ trend.summary }}">
+  {% for tick in trend.y_ticks %}
+    <line class="grid" x1="{{ trend.left }}" x2="{{ trend.right }}" y1="{{ tick.y }}" y2="{{ tick.y }}"/>
+    <text class="axis" x="{{ trend.left|add:-8 }}" y="{{ tick.label_y }}" text-anchor="end">{{ tick.label }}</text>
+  {% endfor %}
+  {% if trend.reference_y is not None %}
+    <line class="average" x1="{{ trend.left }}" x2="{{ trend.right }}" y1="{{ trend.reference_y }}" y2="{{ trend.reference_y }}"/>
+  {% endif %}
+  {% for tick in trend.x_ticks %}
+    <text class="axis{% if not tick.present %} faint{% endif %}" x="{{ tick.x }}" y="{{ trend.label_y }}" text-anchor="middle">{{ tick.season }}</text>
+  {% endfor %}
+  {% for line in trend.lines %}
+    <polyline class="trend" points="{{ line }}"/>
+  {% endfor %}
+  {% for point in trend.points %}
+    <circle class="dot" cx="{{ point.x }}" cy="{{ point.y }}" r="4"><title>{{ point.season }}: {{ point.label }}</title></circle>
+    {% if point.labelled %}<text class="value" x="{{ point.x }}" y="{{ point.label_y }}" text-anchor="middle">{{ point.label }}</text>{% endif %}
+  {% endfor %}
+</svg>

@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .management.commands.load_lahman import season_batting, season_positions
+from .charts import trend
 from .matching import Crosswalk
 from .metrics import contact_quality
 from .models import BattingSeason, ContactQuality, FangraphsSeason, Player, StatcastSeason, UnmatchedRecord
@@ -90,6 +91,33 @@ class ContactQualityTests(TestCase):
 
     def test_too_few_hitters_gives_nothing(self):
         self.assertTrue(contact_quality(self.frame(), min_bbe=350).empty)
+
+
+class ChartTests(TestCase):
+    def test_counting_stat_axis_starts_at_zero_on_whole_numbers(self):
+        layout = trend({2021: 3, 2022: 7, 2023: 12}, floor=0, whole=True, label=lambda v: str(round(v)))
+        labels = [tick["label"] for tick in layout["y_ticks"]]
+        self.assertEqual(labels[0], "0")
+        self.assertEqual(len(set(labels)), len(labels))
+        self.assertGreaterEqual(int(labels[-1]), 12)
+
+    def test_flat_and_all_zero_lines_still_lay_out(self):
+        self.assertEqual(len(trend({2021: 0, 2022: 0}, floor=0, whole=True)["points"]), 2)
+        self.assertEqual(len(trend({2021: 0.3, 2022: 0.3})["points"]), 2)
+
+    def test_rate_axis_never_goes_negative(self):
+        layout = trend({2021: 0.0, 2022: 0.25}, label=lambda v: f"{v:.3f}")
+        self.assertEqual(layout["y_ticks"][0]["label"], "0.000")
+
+    def test_long_careers_thin_out_labels(self):
+        values = {1990 + i: 10 + (i * 7) % 23 for i in range(22)}
+        layout = trend(values, floor=0, whole=True)
+        self.assertLessEqual(sum(p["labelled"] for p in layout["points"]), 4)
+        self.assertLessEqual(len(layout["x_ticks"]), 14)
+        self.assertEqual(layout["x_ticks"][-1]["season"], 2011)
+
+    def test_one_season_is_not_a_trend(self):
+        self.assertIsNone(trend({2024: 30}))
 
 
 class LahmanShapingTests(TestCase):
@@ -182,6 +210,46 @@ class ViewTests(TestCase):
         self.assertContains(response, "#1 of 1 at")
         self.assertEqual(response.context["career"].hr, 111)
         self.assertContains(response, "No FanGraphs seasons loaded")
+
+    def test_trend_chart_needs_two_scored_seasons(self):
+        url = reverse("hub:player", args=[592450])
+        self.assertIsNone(self.client.get(url).context["trend"])
+
+        # Add 2023 and 2024, skipping nothing between them but leaving 2025 out.
+        for season, score in ((2023, 156.0), (2024, 152.0)):
+            ContactQuality.objects.create(
+                player_id=592450, season=season, score=score, percentile=99, ev_z=2, hard_hit_z=2, sweet_spot_z=0
+            )
+        response = self.client.get(url)
+        trend = response.context["trend"]
+        self.assertEqual([p["season"] for p in trend["points"]], [2023, 2024, 2026])
+        # 2023-2024 join up; 2026 stands alone after the 2025 gap.
+        self.assertEqual(len(trend["lines"]), 1)
+        self.assertTrue(trend["has_gap"])
+        # Higher scores sit higher on the page (smaller y), and 100 is on the axis.
+        ys = {p["season"]: p["y"] for p in trend["points"]}
+        self.assertLess(ys[2023], ys[2024])
+        self.assertLess(ys[2024], ys[2026])
+        self.assertGreater(trend["reference_y"], ys[2026])
+        self.assertContains(response, "<polyline")
+
+    def test_batting_chart_offers_every_stat_with_hr_first_shown(self):
+        response = self.client.get(reverse("hub:player", args=[592450]))
+        charts = {chart["key"]: chart for chart in response.context["batting_charts"]}
+        self.assertEqual(len(charts), 16)
+        self.assertEqual([key for key, chart in charts.items() if chart["selected"]], ["hr"])
+        self.assertEqual([p["label"] for p in charts["hr"]["trend"]["points"]], ["58", "53"])
+        # 180 hits in 550 at-bats, shown the way a batting average is written.
+        self.assertEqual(charts["avg"]["trend"]["points"][0]["label"], ".327")
+        self.assertContains(response, 'data-stat="hr">')
+        self.assertContains(response, 'data-stat="avg" hidden>')
+
+    def test_batting_chart_needs_two_seasons(self):
+        soto = Player.objects.get(pk=665742)
+        BattingSeason.objects.create(player=soto, season=2025, team="NYM", g=150, ab=550, h=150, hr=40)
+        response = self.client.get(reverse("hub:player", args=[665742]))
+        self.assertEqual(response.context["batting_charts"], [])
+        self.assertNotContains(response, "batting-chart")
 
     def test_player_without_data_still_renders(self):
         response = self.client.get(reverse("hub:player", args=[1]))

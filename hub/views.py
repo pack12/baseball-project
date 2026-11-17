@@ -1,27 +1,53 @@
 from django.db.models import Max, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .metrics import MIN_BBE, WEIGHTS
+from .charts import trend
+from .metrics import MIN_BBE, SCALE_MEAN, WEIGHTS
 from .models import BattingSeason, ContactQuality, Player, StatcastSeason
 from .names import name_key
+from .templatetags.hubfmt import rate
 
 SEARCH_LIMIT = 50
-LEADERBOARD_SIZE = 50
 OUTFIELD = ["LF", "CF", "RF"]
 POSITIONS = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "OF", "DH"]
+
+# Stats offered on the batting chart: (BattingSeason attribute, heading, is a rate stat).
+BATTING_CHART_STATS = [
+    ("g", "G", False), ("pa", "PA", False), ("ab", "AB", False), ("r", "R", False), ("h", "H", False),
+    ("doubles", "2B", False), ("triples", "3B", False), ("hr", "HR", False), ("rbi", "RBI", False),
+    ("sb", "SB", False), ("bb", "BB", False), ("so", "SO", False),
+    ("avg", "AVG", True), ("obp", "OBP", True), ("slg", "SLG", True), ("ops", "OPS", True),
+]
+BATTING_CHART_DEFAULT = "hr"
+
+
+def _batting_charts(batting):
+    charts = []
+    for key, title, is_rate in BATTING_CHART_STATS:
+        # A rate stat is undefined (None) in a season without an at-bat.
+        values = {row.season: getattr(row, key) for row in batting if getattr(row, key) is not None}
+        if is_rate:
+            layout = trend(values, label=rate)
+        else:
+            layout = trend(values, floor=0, whole=True, label=lambda v: str(round(v)))
+        if layout:
+            charts.append({"key": key, "title": title, "trend": layout, "selected": key == BATTING_CHART_DEFAULT})
+    if charts and not any(chart["selected"] for chart in charts):
+        charts[0]["selected"] = True
+    return charts
 
 
 def _latest_season():
     return ContactQuality.objects.aggregate(latest=Max("season"))["latest"]
 
 
-def _leaders(season, position=None, limit=LEADERBOARD_SIZE):
+def _leaders(season, position=None, limit=None):
     rows = ContactQuality.objects.filter(season=season).select_related("player")
     if position == "OF":
         rows = rows.filter(position__in=OUTFIELD)
     elif position:
         rows = rows.filter(position=position)
-    rows = list(rows.order_by("-score")[:limit])
+    rows = list(rows.order_by("-score")[:limit])  # limit=None: every qualified hitter
     statcast = {
         s.player_id: s
         for s in StatcastSeason.objects.filter(season=season, player_id__in=[r.player_id for r in rows])
@@ -92,6 +118,13 @@ def player_detail(request, mlbam_id):
         {
             "player": player,
             "headline": headline,
+            "trend": trend(
+                {season: cq.score for season, cq in scores.items()},
+                reference=SCALE_MEAN,
+                whole=True,
+                label=lambda v: str(round(v)),
+            ),
+            "batting_charts": _batting_charts(batting),
             "statcast": statcast,
             "batting": batting,
             "career": career,

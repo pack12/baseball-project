@@ -37,6 +37,15 @@
         <div><span class="muted">Sweet-spot rate</span><strong>{{ headline.inputs.sweet_spot_pct|dec }}%</strong><span class="muted">{{ headline.sweet_spot_z|signed }} SD</span></div>
       </div>
     </div>
+    {% if trend %}
+      <div class="card chart">
+        <div class="small muted">
+          Score by season · dashed line is the league average (100){% if trend.has_gap %}
+          · gaps are seasons with fewer than {{ min_bbe }} batted balls{% endif %}
+        </div>
+        {% include "hub/_trend.html" with title="Contact Quality Score" %}
+      </div>
+    {% endif %}
   {% else %}
     <p class="empty">No score: it needs a season of {{ min_bbe }}+ tracked batted balls (Statcast began in 2015).</p>
   {% endif %}
@@ -44,7 +53,7 @@
   <h2>Statcast</h2>
   {% if statcast %}
     <div class="scroll">
-      <table>
+      <table class="sortable">
         <thead>
           <tr>
             <th class="l">Season</th><th>CQ Score</th><th>BBE</th><th>Avg EV</th><th>Max EV</th><th>Avg LA</th>
@@ -80,8 +89,39 @@
 
   <h2>Traditional batting <span class="muted small">Lahman</span></h2>
   {% if batting %}
+    {% if batting_charts %}
+      <div class="card chart" id="batting-chart">
+        <label class="small muted">
+          Stat by season
+          <select aria-label="Stat to chart">
+            {% for chart in batting_charts %}
+              <option value="{{ chart.key }}"{% if chart.selected %} selected{% endif %}>{{ chart.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        {% for chart in batting_charts %}
+          <div data-stat="{{ chart.key }}"{% if not chart.selected %} hidden{% endif %}>
+            {% include "hub/_trend.html" with trend=chart.trend title=chart.title %}
+            {% if chart.trend.has_gap %}<div class="small muted">Gaps are seasons with no batting line.</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <script>
+        (function () {
+          var card = document.getElementById("batting-chart");
+          var select = card.querySelector("select");
+          function show() {
+            card.querySelectorAll("[data-stat]").forEach(function (chart) {
+              chart.hidden = chart.dataset.stat !== select.value;
+            });
+          }
+          select.addEventListener("change", show);
+          show();  // a reloaded page can keep the previous choice in the dropdown
+        })();
+      </script>
+    {% endif %}
     <div class="scroll">
-      <table>
+      <table class="sortable">
         <thead>
           <tr>
             <th class="l">Season</th><th class="l">Team</th><th class="l">Pos</th><th>G</th><th>PA</th><th>AB</th><th>R</th><th>H</th>
@@ -116,7 +156,7 @@
   <h2>FanGraphs</h2>
   {% if fangraphs %}
     <div class="scroll">
-      <table>
+      <table class="sortable">
         <thead>
           <tr>
             <th class="l">Season</th><th class="l">Team</th><th>G</th><th>PA</th><th>HR</th>

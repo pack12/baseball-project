@@ -28,6 +28,11 @@
     th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
     th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); background: #fafbfc; }
     th.l, td.l { text-align: left; }
+    table.sortable th { cursor: pointer; user-select: none; }
+    table.sortable th:hover { color: var(--ink); }
+    table.sortable th[aria-sort] { color: var(--accent); }
+    table.sortable th[aria-sort=ascending]::after { content: " ▲"; }
+    table.sortable th[aria-sort=descending]::after { content: " ▼"; }
     tr:last-child td { border-bottom: 0; }
     tr.total td { font-weight: 600; background: #fafbfc; }
     .score { font-weight: 700; }
@@ -35,6 +40,16 @@
     .headline .big { font-size: 46px; font-weight: 800; line-height: 1; }
     .parts { display: flex; gap: 24px; flex-wrap: wrap; }
     .parts div span { display: block; }
+    .chart { margin-top: 12px; }
+    .chart svg { display: block; width: 100%; max-width: 760px; height: auto; margin-top: 6px; }
+    .chart .grid { stroke: var(--line); stroke-width: 1; }
+    .chart .average { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+    .chart .trend { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+    .chart .dot { fill: var(--accent); stroke: #fff; stroke-width: 2; }
+    .chart .axis { font-size: 11px; fill: var(--muted); }
+    .chart .axis.faint { fill: #b3bac3; }
+    .chart .value { font-size: 12px; font-weight: 600; fill: var(--ink); }
+    .chart select { margin-left: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; }
     .pills { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
     .pills a { padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink); font-size: 13px; }
     .pills a.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -54,5 +69,50 @@
     </div>
   </header>
   <main>{% block content %}{% endblock %}</main>
+  <script>
+    // Click a column heading to sort; click again to reverse.
+    (function () {
+      var NUMERIC = /^-?[\d.,]+(st|nd|rd|th|%)?$/;
+
+      function cellText(row, index) {
+        return row.cells[index] ? row.cells[index].textContent.trim() : "";
+      }
+
+      function sortBy(table, th) {
+        var index = th.cellIndex;
+        var body = table.tBodies[0];
+        // A totals row (career line) stays at the bottom whatever the order.
+        var rows = Array.from(body.rows).filter(function (r) { return !r.classList.contains("total"); });
+        var totals = Array.from(body.rows).filter(function (r) { return r.classList.contains("total"); });
+        var filled = rows.map(function (r) { return cellText(r, index); }).filter(function (t) { return t && t !== "—"; });
+        var numeric = filled.length > 0 && filled.every(function (t) { return NUMERIC.test(t); });
+
+        // Numbers start high-to-low, names start A-to-Z.
+        var first = numeric ? "descending" : "ascending";
+        var other = numeric ? "ascending" : "descending";
+        var direction = th.getAttribute("aria-sort") === first ? other : first;
+        var sign = direction === "ascending" ? 1 : -1;
+
+        rows.sort(function (a, b) {
+          var x = cellText(a, index), y = cellText(b, index);
+          var xBlank = !x || x === "—", yBlank = !y || y === "—";
+          if (xBlank || yBlank) return xBlank - yBlank;  // blanks always last
+          if (numeric) return sign * (parseFloat(x.replace(/,/g, "")) - parseFloat(y.replace(/,/g, "")));
+          return sign * x.localeCompare(y);
+        });
+
+        Array.from(th.parentNode.cells).forEach(function (cell) { cell.removeAttribute("aria-sort"); });
+        th.setAttribute("aria-sort", direction);
+        rows.concat(totals).forEach(function (r) { body.appendChild(r); });
+      }
+
+      document.querySelectorAll("table.sortable").forEach(function (table) {
+        table.tHead.addEventListener("click", function (event) {
+          var th = event.target.closest("th");
+          if (th) sortBy(table, th);
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

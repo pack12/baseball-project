@@ -1,6 +1,6 @@
 {% load hubfmt %}
 <div class="scroll">
-  <table>
+  <table{% if sortable %} class="sortable"{% endif %}>
     <thead>
       <tr>
         <th>#</th><th class="l">Player</th><th class="l">Pos</th><th>Score</th><th>Pctl</th>

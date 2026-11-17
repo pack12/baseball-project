@@ -24,7 +24,7 @@
     </div>
 
     {% if leaders %}
-      {% include "hub/_leaders.html" %}
+      {% include "hub/_leaders.html" with sortable=True %}
     {% else %}
       <p class="empty">No qualified hitters at this position in {{ season }}.</p>
     {% endif %}
